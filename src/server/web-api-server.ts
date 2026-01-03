@@ -70,6 +70,25 @@ export class WebApiServer {
             res.json({ status: 'ok', blockchain: this.blockchainService.isEnabled() });
         });
 
+        // Get blockchain configuration
+        this.app.get('/api/crypto/config', (req, res) => {
+            try {
+                const contractAddress = process.env.CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000000';
+                const networkId = parseInt(process.env.NETWORK_ID || '80002');
+                const rpcUrl = process.env.POLYGON_RPC_URL || 'https://rpc-amoy.polygon.technology';
+                
+                res.json({
+                    contractAddress,
+                    networkId,
+                    rpcUrl,
+                    enabled: this.blockchainService.isEnabled()
+                });
+            } catch (error) {
+                logger.error('Error fetching blockchain config:', error);
+                res.status(500).json({ error: 'Failed to load configuration' });
+            }
+        });
+
         // Link wallet to game account
         this.app.post('/api/crypto/link', async (req, res) => {
             try {

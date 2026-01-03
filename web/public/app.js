@@ -2,8 +2,10 @@
 // Companion web app for cryptocurrency-backed economy
 
 const API_BASE_URL = 'http://localhost:43595/api'; // Web API server endpoint
-const CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000000'; // Replace with actual contract address
-const POLYGON_NETWORK_ID = 80002; // Polygon Amoy Testnet
+
+// Contract configuration will be loaded from server
+let CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000000';
+let POLYGON_NETWORK_ID = 80002; // Default to Polygon Amoy Testnet
 
 // Contract ABI (minimal interface)
 const CONTRACT_ABI = [
@@ -23,15 +25,25 @@ class RuneGoldWallet {
         this.walletAddress = null;
         this.gameUsername = null;
         this.isLinked = false;
+        this.configLoaded = false;
         
         this.init();
     }
 
-    init() {
+    async init() {
         // Check if MetaMask is installed
         if (typeof window.ethereum === 'undefined') {
             this.showError('MetaMask is not installed. Please install MetaMask to use this feature.');
             document.getElementById('connectWalletBtn').disabled = true;
+            return;
+        }
+
+        // Load blockchain configuration from server
+        try {
+            await this.loadBlockchainConfig();
+        } catch (error) {
+            console.error('Failed to load blockchain config:', error);
+            this.showError('Failed to load blockchain configuration. Please ensure the web API server is running.');
             return;
         }
 
@@ -54,6 +66,34 @@ class RuneGoldWallet {
         });
     }
 
+    async loadBlockchainConfig() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/crypto/config`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch blockchain configuration');
+            }
+            
+            const config = await response.json();
+            CONTRACT_ADDRESS = config.contractAddress;
+            POLYGON_NETWORK_ID = config.networkId;
+            
+            console.log('Loaded blockchain config:', {
+                contractAddress: CONTRACT_ADDRESS,
+                networkId: POLYGON_NETWORK_ID,
+                enabled: config.enabled
+            });
+            
+            if (CONTRACT_ADDRESS === '0x0000000000000000000000000000000000000000') {
+                this.showError('⚠️ Contract Not Configured\n\nThe RuneGoldToken contract address is not set in the server configuration (.env file).\n\nPlease:\n1. Deploy the contract to Polygon Amoy testnet\n2. Add CONTRACT_ADDRESS=0x... to your .env file\n3. Restart the web API server\n\nSee docs/CONTRACT_DEPLOYMENT.md for instructions.');
+            }
+            
+            this.configLoaded = true;
+        } catch (error) {
+            console.error('Error loading blockchain config:', error);
+            throw error;
+        }
+    }
+
     setupEventListeners() {
         document.getElementById('connectWalletBtn').addEventListener('click', () => this.connectWallet());
         document.getElementById('linkAccountBtn').addEventListener('click', () => this.linkAccount());
@@ -65,6 +105,18 @@ class RuneGoldWallet {
     async connectWallet() {
         try {
             this.showLoading('Connecting to MetaMask...');
+
+            // Ensure config is loaded
+            if (!this.configLoaded) {
+                this.showError('Configuration not loaded. Please refresh the page.');
+                return;
+            }
+
+            // Check if contract address is configured
+            if (CONTRACT_ADDRESS === '0x0000000000000000000000000000000000000000') {
+                this.showError('⚠️ Contract Not Deployed\n\nThe RuneGoldToken contract address is not configured in the server.\n\nPlease update the CONTRACT_ADDRESS in your .env file and restart the web API server.\n\nSee docs/CONTRACT_DEPLOYMENT.md for deployment instructions.');
+                return;
+            }
 
             // Request account access
             const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
@@ -78,6 +130,13 @@ class RuneGoldWallet {
             const network = await this.provider.getNetwork();
             if (network.chainId !== POLYGON_NETWORK_ID) {
                 await this.switchToPolygon();
+            }
+
+            // Verify contract is deployed
+            const code = await this.provider.getCode(CONTRACT_ADDRESS);
+            if (code === '0x') {
+                this.showError('⚠️ Contract Not Found\n\nNo contract deployed at: ' + CONTRACT_ADDRESS + '\n\nPlease verify:\n1. Contract is deployed to Polygon Amoy (Chain ID: ' + POLYGON_NETWORK_ID + ')\n2. CONTRACT_ADDRESS in .env is correct\n3. You are connected to the right network\n\nCurrent network: Chain ID ' + network.chainId);
+                return;
             }
 
             // Initialize contract
@@ -131,9 +190,15 @@ class RuneGoldWallet {
 
     async checkIfLinked() {
         try {
+            if (!this.contract) {
+                return false;
+            }
             return await this.contract.isLinked(this.walletAddress);
         } catch (error) {
             console.error('Error checking link status:', error);
+            if (error.code === 'CALL_EXCEPTION') {
+                this.showError('Unable to communicate with smart contract. Please ensure the contract is deployed correctly.');
+            }
             return false;
         }
     }
