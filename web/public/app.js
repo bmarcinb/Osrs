@@ -146,6 +146,12 @@ class RuneGoldWallet {
             return;
         }
 
+        // Check if wallet is connected and signer is initialized
+        if (!this.signer || !this.walletAddress) {
+            this.showError('Please connect your wallet first');
+            return;
+        }
+
         try {
             this.showLoading('Linking account...');
 
@@ -196,6 +202,17 @@ class RuneGoldWallet {
             return;
         }
 
+        // Check if wallet is connected and contract is initialized
+        if (!this.contract || !this.walletAddress) {
+            this.showError('Please connect your wallet first');
+            return;
+        }
+
+        if (!this.gameUsername) {
+            this.showError('Please link your game account first');
+            return;
+        }
+
         try {
             this.showLoading('Processing deposit...');
 
@@ -242,6 +259,17 @@ class RuneGoldWallet {
             return;
         }
 
+        // Check if wallet is connected
+        if (!this.walletAddress) {
+            this.showError('Please connect your wallet first');
+            return;
+        }
+
+        if (!this.gameUsername) {
+            this.showError('Please link your game account first');
+            return;
+        }
+
         try {
             this.showLoading('Processing withdrawal...');
 
@@ -273,6 +301,11 @@ class RuneGoldWallet {
     }
 
     async refreshBalance() {
+        // Check if wallet and contract are initialized
+        if (!this.contract || !this.walletAddress || !this.gameUsername) {
+            return;
+        }
+
         try {
             // Get wallet balance
             const walletBalance = await this.contract.balanceOf(this.walletAddress);
