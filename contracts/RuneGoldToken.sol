@@ -46,7 +46,7 @@ contract RuneGoldToken is ERC20, Pausable, ReentrancyGuard, Ownable {
      * @dev Constructor that mints initial supply to contract owner
      * @param initialSupply Initial token supply (without decimals)
      */
-    constructor(uint256 initialSupply) ERC20("RuneGold", "RGP") {
+    constructor(uint256 initialSupply) ERC20("RuneGold", "RGP") Ownable(msg.sender) {
         // Mint initial supply to contract deployer
         _mint(msg.sender, initialSupply);
     }
