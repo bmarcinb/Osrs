@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RuneGold Wallet - Crypto Economy</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-indicator.connected {
+            background: #10b981;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+
+        .status-indicator.disconnected {
+            background: #ef4444;
+        }
+
+        .card {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card h2 {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .balance-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .balance-label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .balance-amount {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .wallet-info {
+            background: #f0f9ff;
+            border-left: 4px solid #0ea5e9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .wallet-address {
+            font-family: monospace;
+            font-size: 12px;
+            color: #0369a1;
+            word-break: break-all;
+        }
+
+        .info-text {
+            color: #666;
+            font-size: 13px;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .error {
+            background: #fee2e2;
+            border-left: 4px solid #ef4444;
+            padding: 15px;
+            border-radius: 8px;
+            color: #991b1b;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .success {
+            background: #d1fae5;
+            border-left: 4px solid #10b981;
+            padding: 15px;
+            border-radius: 8px;
+            color: #065f46;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.6s linear infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🪙 RuneGold Wallet</h1>
+            <p>Manage your cryptocurrency-backed in-game gold</p>
+        </div>
+
+        <!-- Connection Status -->
+        <div id="connectionStatus" class="card">
+            <h2>
+                <span class="status-indicator disconnected" id="statusIndicator"></span>
+                <span id="statusText">Not Connected</span>
+            </h2>
+        </div>
+
+        <!-- Wallet Connection Section -->
+        <div id="walletSection" class="card">
+            <h2>Connect Wallet</h2>
+            <p class="info-text">Connect your MetaMask wallet to link it with your game account and manage your RuneGold tokens.</p>
+            <button id="connectWalletBtn" class="btn btn-primary">Connect MetaMask</button>
+            
+            <div id="walletConnected" class="hidden">
+                <div class="wallet-info">
+                    <strong>Wallet Address:</strong><br>
+                    <span class="wallet-address" id="walletAddress"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Account Linking -->
+        <div id="linkSection" class="card hidden">
+            <h2>Link Game Account</h2>
+            <p class="info-text">Enter your in-game username to link your wallet with your game account.</p>
+            <div class="input-group">
+                <label for="username">Game Username</label>
+                <input type="text" id="username" placeholder="Enter your username">
+            </div>
+            <button id="linkAccountBtn" class="btn btn-primary">Link Account</button>
+        </div>
+
+        <!-- Balance Display -->
+        <div id="balanceSection" class="card hidden">
+            <h2>Balances</h2>
+            <div class="balance-display">
+                <span class="balance-label">Wallet Balance (RGP):</span>
+                <span class="balance-amount" id="walletBalance">0</span>
+            </div>
+            <div class="balance-display">
+                <span class="balance-label">In-Game Gold:</span>
+                <span class="balance-amount" id="gameBalance">0</span>
+            </div>
+            <button id="refreshBalanceBtn" class="btn btn-secondary">🔄 Refresh Balance</button>
+        </div>
+
+        <!-- Deposit Section -->
+        <div id="depositSection" class="card hidden">
+            <h2>Deposit Tokens → In-Game Gold</h2>
+            <p class="info-text">Transfer RGP tokens from your wallet to your in-game gold balance (1:1 ratio).</p>
+            <div class="input-group">
+                <label for="depositAmount">Amount to Deposit</label>
+                <input type="number" id="depositAmount" placeholder="Enter amount" min="1">
+            </div>
+            <button id="depositBtn" class="btn btn-secondary">Deposit to Game</button>
+        </div>
+
+        <!-- Withdraw Section -->
+        <div id="withdrawSection" class="card hidden">
+            <h2>Withdraw In-Game Gold → Tokens</h2>
+            <p class="info-text">Convert your in-game gold to RGP tokens in your wallet (min: 1000, max: 1,000,000).</p>
+            <div class="input-group">
+                <label for="withdrawAmount">Amount to Withdraw</label>
+                <input type="number" id="withdrawAmount" placeholder="Enter amount" min="1000" max="1000000">
+            </div>
+            <button id="withdrawBtn" class="btn btn-danger">Withdraw to Wallet</button>
+        </div>
+
+        <!-- Messages -->
+        <div id="messageArea"></div>
+    </div>
+
+    <!-- Load ethers.js from jsDelivr CDN (more reliable) -->
+    <script 
+        src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js" 
+        type="text/javascript"
+        crossorigin="anonymous"
+        onload="console.log('Ethers loaded successfully')"
+        onerror="console.error('Failed to load ethers from jsDelivr')">
+    </script>
+    <script src="app.js" type="text/javascript" defer></script>
+</body>
+</html>

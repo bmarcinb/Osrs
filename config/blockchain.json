@@ -1,0 +1,12 @@
+{
+    "enabled": false,
+    "network": "polygon",
+    "rpcUrl": "https://polygon-rpc.com",
+    "contractAddress": "0x0000000000000000000000000000000000000000",
+    "privateKey": "env:BLOCKCHAIN_PRIVATE_KEY",
+    "gasLimit": 100000,
+    "confirmations": 12,
+    "withdrawalCooldown": 300,
+    "minWithdrawal": 1000,
+    "maxWithdrawal": 1000000
+}

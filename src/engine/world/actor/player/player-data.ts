@@ -24,6 +24,20 @@ export interface Appearance {
     skinColor: number;
 }
 
+/**
+ * Crypto wallet information for blockchain integration
+ */
+export interface CryptoWallet {
+    address: string;
+    linkedAt: Date;
+    verified: boolean;
+    sessionToken?: string;
+    sessionExpiry?: Date;
+    lastSettlement?: Date;
+    pendingDeposit?: number;
+    pendingWithdrawal?: number;
+}
+
 export class PlayerSettings {
     musicVolume: number = 0;
     musicPlayerMode: number = MusicPlayerMode.AUTO;
@@ -70,6 +84,8 @@ export interface PlayerSave {
     achievements: string[];
     friendsList: string[];
     ignoreList: string[];
+    cryptoWallet?: CryptoWallet;
+    goldBalance?: number;
 }
 
 export const defaultAppearance = (): Appearance => {
@@ -140,6 +156,8 @@ export function savePlayerData(player: Player): boolean {
         achievements: player.achievements,
         friendsList: player.friendsList,
         ignoreList: player.ignoreList,
+        cryptoWallet: player.cryptoWallet,
+        goldBalance: player.savedMetadata.goldBalance,
     };
 
     try {
@@ -180,5 +198,23 @@ export function loadPlayerSave(username: string): PlayerSave | null {
     } catch (error) {
         logger.error(`Malformed player save data for ${username}.`);
         return null;
+    }
+}
+
+/**
+ * Save PlayerSave object directly to file
+ * This is used by the web API to update player data while they're offline
+ */
+export function savePlayerSaveData(playerSave: PlayerSave): boolean {
+    const fileName = playerSave.username.toLowerCase() + '.json';
+    const filePath = join('data/saves', fileName);
+
+    try {
+        writeFileSync(filePath, JSON.stringify(playerSave, null, 4));
+        logger.info(`Saved player data for ${playerSave.username}`);
+        return true;
+    } catch (error) {
+        logger.error(`Error saving player data for ${playerSave.username}:`, error);
+        return false;
     }
 }
