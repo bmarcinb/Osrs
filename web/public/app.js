@@ -1,9 +1,9 @@
 // RuneGold Wallet Web Interface
 // Companion web app for cryptocurrency-backed economy
 
-const API_BASE_URL = 'http://localhost:43594/api'; // Game server API endpoint
+const API_BASE_URL = 'http://localhost:43595/api'; // Web API server endpoint
 const CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000000'; // Replace with actual contract address
-const POLYGON_NETWORK_ID = 137; // Polygon Mainnet
+const POLYGON_NETWORK_ID = 80002; // Polygon Amoy Testnet
 
 // Contract ABI (minimal interface)
 const CONTRACT_ABI = [
@@ -104,7 +104,7 @@ class RuneGoldWallet {
         try {
             await window.ethereum.request({
                 method: 'wallet_switchEthereumChain',
-                params: [{ chainId: '0x89' }], // 137 in hex
+                params: [{ chainId: '0x13882' }], // 80002 in hex (Amoy Testnet)
             });
         } catch (error) {
             // Network doesn't exist, add it
@@ -112,15 +112,15 @@ class RuneGoldWallet {
                 await window.ethereum.request({
                     method: 'wallet_addEthereumChain',
                     params: [{
-                        chainId: '0x89',
-                        chainName: 'Polygon Mainnet',
+                        chainId: '0x13882',
+                        chainName: 'Polygon Amoy Testnet',
                         nativeCurrency: {
                             name: 'MATIC',
                             symbol: 'MATIC',
                             decimals: 18
                         },
-                        rpcUrls: ['https://polygon-rpc.com'],
-                        blockExplorerUrls: ['https://polygonscan.com']
+                        rpcUrls: ['https://rpc-amoy.polygon.technology'],
+                        blockExplorerUrls: ['https://amoy.polygonscan.com']
                     }]
                 });
             } else {
@@ -388,5 +388,15 @@ class RuneGoldWallet {
 
 // Initialize the wallet when page loads
 document.addEventListener('DOMContentLoaded', () => {
+    // Check if ethers is loaded
+    if (typeof ethers === 'undefined') {
+        console.error('Ethers library not loaded');
+        const messageArea = document.getElementById('messageArea');
+        if (messageArea) {
+            messageArea.innerHTML = '<div class="error">Failed to load required libraries. Please refresh the page.</div>';
+        }
+        return;
+    }
+    
     window.wallet = new RuneGoldWallet();
 });

@@ -196,7 +196,7 @@ This will install the newly added packages:
 
 2. **Deploy Smart Contract:**
 
-For testing, use Polygon Mumbai testnet:
+For testing, use Polygon Amoy testnet:
 
 ```bash
 # Install Hardhat
@@ -206,7 +206,7 @@ npm install --save-dev hardhat @nomiclabs/hardhat-ethers
 npx hardhat init
 
 # Deploy contract
-npx hardhat run scripts/deploy.js --network mumbai
+npx hardhat run scripts/deploy.js --network amoy
 ```
 
 3. **Configure Environment:**
@@ -220,10 +220,10 @@ cp .env.example .env
 Edit `.env`:
 ```
 BLOCKCHAIN_ENABLED=true
-POLYGON_RPC_URL=https://rpc-mumbai.maticvigil.com
+POLYGON_RPC_URL=https://rpc-amoy.polygon.technology
 CONTRACT_ADDRESS=0xYourDeployedContractAddress
 BLOCKCHAIN_PRIVATE_KEY=your_private_key_here
-NETWORK_ID=80001
+NETWORK_ID=80002
 ```
 
 4. **Update Blockchain Configuration:**
@@ -233,7 +233,7 @@ Edit `config/blockchain.json`:
 {
   "enabled": true,
   "network": "polygon",
-  "rpcUrl": "https://rpc-mumbai.maticvigil.com",
+  "rpcUrl": "https://rpc-amoy.polygon.technology",
   "contractAddress": "0xYourDeployedContractAddress",
   "privateKey": "env:BLOCKCHAIN_PRIVATE_KEY",
   "gasLimit": 100000,
@@ -438,7 +438,7 @@ npm test
 
 ### Integration Testing
 
-1. Deploy contract to Mumbai testnet
+1. Deploy contract to Amoy testnet
 2. Configure server with testnet settings
 3. Test full deposit/withdrawal flow
 4. Verify balance synchronization

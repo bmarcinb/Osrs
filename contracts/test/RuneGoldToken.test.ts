@@ -56,7 +56,7 @@ RuneGoldToken Test Suite
 
 To implement full tests:
 1. Install Hardhat: npm install --save-dev hardhat @nomiclabs/hardhat-ethers ethers
-2. Configure hardhat.config.js for Polygon testnet (Mumbai)
+2. Configure hardhat.config.js for Polygon testnet (Amoy)
 3. Implement test cases using ethers.js and Hardhat
 4. Run with: npx hardhat test
 
