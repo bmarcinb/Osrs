@@ -46,16 +46,20 @@ export class Web3Provider {
     private provider: ethers.JsonRpcProvider | null = null;
     private wallet: ethers.Wallet | null = null;
     private contract: ethers.Contract | null = null;
-    private config: BlockchainConfig;
+    private config: BlockchainConfig | null = null;
 
     constructor() {
-        this.config = this.loadConfig();
+        // Lazy initialization - don't load config until needed
     }
 
     /**
      * Load blockchain configuration from file
      */
     private loadConfig(): BlockchainConfig {
+        if (this.config) {
+            return this.config;
+        }
+
         try {
             const configPath = join('config', 'blockchain.json');
             const configData = readFileSync(configPath, 'utf8');
@@ -67,10 +71,11 @@ export class Web3Provider {
                 config.privateKey = process.env[envVar] || '';
             }
 
+            this.config = config;
             return config;
         } catch (error) {
-            logger.error('Failed to load blockchain configuration:', error);
-            return {
+            // Only log if blockchain is actually being used
+            const defaultConfig: BlockchainConfig = {
                 enabled: false,
                 network: 'polygon',
                 rpcUrl: '',
@@ -82,6 +87,8 @@ export class Web3Provider {
                 minWithdrawal: 1000,
                 maxWithdrawal: 1000000,
             };
+            this.config = defaultConfig;
+            return defaultConfig;
         }
     }
 
@@ -89,24 +96,26 @@ export class Web3Provider {
      * Initialize the Web3 provider and connect to the blockchain
      */
     public async initialize(): Promise<boolean> {
-        if (!this.config.enabled) {
+        const config = this.loadConfig();
+        
+        if (!config.enabled) {
             logger.info('Blockchain integration is disabled');
             return false;
         }
 
         try {
             // Initialize provider
-            this.provider = new ethers.JsonRpcProvider(this.config.rpcUrl);
+            this.provider = new ethers.JsonRpcProvider(config.rpcUrl);
 
             // Initialize wallet
-            if (this.config.privateKey) {
-                this.wallet = new ethers.Wallet(this.config.privateKey, this.provider);
+            if (config.privateKey) {
+                this.wallet = new ethers.Wallet(config.privateKey, this.provider);
             }
 
             // Initialize contract
-            if (this.wallet && this.config.contractAddress) {
+            if (this.wallet && config.contractAddress) {
                 this.contract = new ethers.Contract(
-                    this.config.contractAddress,
+                    config.contractAddress,
                     RUNE_GOLD_TOKEN_ABI,
                     this.wallet
                 );
@@ -127,7 +136,8 @@ export class Web3Provider {
      * Check if the provider is initialized and enabled
      */
     public isEnabled(): boolean {
-        return this.config.enabled && this.provider !== null;
+        const config = this.config || this.loadConfig();
+        return config.enabled && this.provider !== null;
     }
 
     /**
@@ -155,7 +165,7 @@ export class Web3Provider {
      * Get blockchain configuration
      */
     public getConfig(): BlockchainConfig {
-        return this.config;
+        return this.config || this.loadConfig();
     }
 
     /**
@@ -234,7 +244,8 @@ export class Web3Provider {
         }
 
         try {
-            const receipt = await this.provider.waitForTransaction(txHash, this.config.confirmations);
+            const config = this.getConfig();
+            const receipt = await this.provider.waitForTransaction(txHash, config.confirmations);
             return receipt;
         } catch (error) {
             logger.error(`Failed to wait for transaction ${txHash}:`, error);
