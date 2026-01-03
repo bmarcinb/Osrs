@@ -6,6 +6,7 @@ import { logger } from '@runejs/common';
 import { launchLoginServer } from '@runejs/login-server';
 import { launchUpdateServer } from '@runejs/update-server';
 import { launchGameServer } from '@server/game/game-server';
+import { launchWebApiServer } from '@server/web-api-server';
 
 const shutdownEvents = [
     'SIGHUP',
@@ -23,12 +24,14 @@ const shutdownEvents = [
 ];
 
 let running: boolean = true;
-let type: 'game' | 'login' | 'update' = 'game';
+let type: 'game' | 'login' | 'update' | 'webapi' = 'game';
 
 if (process.argv.indexOf('-login') !== -1) {
     type = 'login';
 } else if (process.argv.indexOf('-update') !== -1) {
     type = 'update';
+} else if (process.argv.indexOf('-webapi') !== -1) {
+    type = 'webapi';
 }
 
 shutdownEvents.forEach(signal =>
@@ -57,4 +60,6 @@ if (type === 'game') {
     launchLoginServer();
 } else if (type === 'update') {
     launchUpdateServer();
+} else if (type === 'webapi') {
+    launchWebApiServer();
 }
