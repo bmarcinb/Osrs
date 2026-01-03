@@ -387,16 +387,23 @@ class RuneGoldWallet {
 }
 
 // Initialize the wallet when page loads
-document.addEventListener('DOMContentLoaded', () => {
+function initializeWallet() {
     // Check if ethers is loaded
     if (typeof ethers === 'undefined') {
-        console.error('Ethers library not loaded');
-        const messageArea = document.getElementById('messageArea');
-        if (messageArea) {
-            messageArea.innerHTML = '<div class="error">Failed to load required libraries. Please refresh the page.</div>';
-        }
+        console.error('Ethers library not loaded, retrying...');
+        // Retry after a short delay
+        setTimeout(initializeWallet, 100);
         return;
     }
     
+    console.log('Ethers library loaded, initializing wallet...');
     window.wallet = new RuneGoldWallet();
-});
+}
+
+// Wait for DOM and try to initialize
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeWallet);
+} else {
+    // DOM already loaded
+    initializeWallet();
+}
