@@ -5,11 +5,15 @@
 
 import express from 'express';
 import cors from 'cors';
+import { config } from 'dotenv';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { logger } from '@runejs/common';
 import { getBlockchainService } from '@engine/world/economy/blockchain-service';
 import { loadPlayerSave, savePlayerData } from '@engine/world/actor/player/player-data';
+
+// Load environment variables from .env file
+config();
 
 export interface WebApiConfig {
     enabled: boolean;
