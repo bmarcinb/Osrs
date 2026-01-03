@@ -131,6 +131,7 @@ export class Player extends Actor {
     public ignoreList: string[] = [];
     public cutscene: Cutscene | null = null;
     public playerEvents: EventEmitter = new EventEmitter();
+    public cryptoWallet?: import('@engine/world/actor/player/player-data').CryptoWallet;
 
     /**
      * Override the Actor's `metadata` property to provide a more specific type.
@@ -769,7 +770,92 @@ export class Player extends Actor {
     }
 
     public hasCoins(amount: number): number {
+        // Check gold balance first, then fall back to inventory coins
+        const goldBalance = this.getGold();
+        if (goldBalance >= amount) {
+            return 0; // Return 0 to indicate gold is available (slot doesn't matter)
+        }
         return this.inventory.items.findIndex(item => item !== null && item.itemId === itemIds.coins && item.amount >= amount);
+    }
+
+    /**
+     * Get total gold balance (replaces coin checks)
+     * Returns the player's current gold balance from savedMetadata
+     */
+    public getGold(): number {
+        return this.savedMetadata.goldBalance || 0;
+    }
+
+    /**
+     * Add gold to the player's balance (from deposits or gameplay)
+     * @param amount The amount of gold to add
+     */
+    public addGold(amount: number): void {
+        if (amount <= 0) {
+            return;
+        }
+        this.savedMetadata.goldBalance = (this.savedMetadata.goldBalance || 0) + amount;
+        this.updateGoldDisplay();
+    }
+
+    /**
+     * Remove gold from the player's balance (for purchases or withdrawals)
+     * @param amount The amount of gold to remove
+     * @returns true if successful, false if insufficient gold
+     */
+    public removeGold(amount: number): boolean {
+        const currentGold = this.savedMetadata.goldBalance || 0;
+        if (currentGold < amount || amount <= 0) {
+            return false;
+        }
+        this.savedMetadata.goldBalance = currentGold - amount;
+        this.updateGoldDisplay();
+        return true;
+    }
+
+    /**
+     * Sync gold display with internal balance
+     * Updates the coins item in inventory to reflect gold balance
+     */
+    public updateGoldDisplay(): void {
+        const goldBalance = this.savedMetadata.goldBalance || 0;
+        
+        // Find existing coin slot in inventory
+        const coinSlot = this.inventory.items.findIndex(
+            item => item !== null && item.itemId === itemIds.coins
+        );
+
+        if (coinSlot !== -1) {
+            // Update existing coin stack
+            if (goldBalance > 0) {
+                this.inventory.set(coinSlot, {
+                    itemId: itemIds.coins,
+                    amount: goldBalance,
+                });
+                this.outgoingPackets.sendUpdateSingleWidgetItem(
+                    widgets.inventory,
+                    coinSlot,
+                    this.inventory.items[coinSlot]
+                );
+            } else {
+                // Remove coins if balance is 0
+                this.inventory.remove(coinSlot);
+                this.outgoingPackets.sendUpdateSingleWidgetItem(widgets.inventory, coinSlot, null);
+            }
+        } else if (goldBalance > 0) {
+            // Add new coin stack if none exists and balance > 0
+            const addedItem = this.inventory.add({
+                itemId: itemIds.coins,
+                amount: goldBalance,
+            });
+            if (addedItem) {
+                this.outgoingPackets.sendUpdateSingleWidgetItem(
+                    widgets.inventory,
+                    addedItem.slot,
+                    addedItem.item
+                );
+            }
+        }
     }
 
     public removeItem(slot: number): void {
@@ -1314,6 +1400,16 @@ export class Player extends Actor {
                 this.savedMetadata = playerSave.savedMetadata;
             }
 
+            // Load crypto wallet data if available
+            if (playerSave.cryptoWallet) {
+                this.cryptoWallet = playerSave.cryptoWallet;
+            }
+
+            // Load gold balance if available
+            if (playerSave.goldBalance !== undefined && playerSave.goldBalance !== null) {
+                this.savedMetadata.goldBalance = playerSave.goldBalance;
+            }
+
             // Existing player logging in
             this.position = new Position(playerSave.position.x, playerSave.position.y, playerSave.position.level);
             if (playerSave.inventory && playerSave.inventory.length !== 0) {
@@ -1364,6 +1460,7 @@ export class Player extends Actor {
             this.savedMetadata = {
                 tutorialProgress: 0,
                 tutorialComplete: false,
+                goldBalance: 0,
             };
         }
 

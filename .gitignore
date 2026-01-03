@@ -8,6 +8,7 @@ node_modules
 server-config.yaml
 
 # local env files
+.env
 .env.local
 .env.*.local
 

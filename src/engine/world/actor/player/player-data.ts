@@ -24,6 +24,20 @@ export interface Appearance {
     skinColor: number;
 }
 
+/**
+ * Crypto wallet information for blockchain integration
+ */
+export interface CryptoWallet {
+    address: string;
+    linkedAt: Date;
+    verified: boolean;
+    sessionToken?: string;
+    sessionExpiry?: Date;
+    lastSettlement?: Date;
+    pendingDeposit?: number;
+    pendingWithdrawal?: number;
+}
+
 export class PlayerSettings {
     musicVolume: number = 0;
     musicPlayerMode: number = MusicPlayerMode.AUTO;
@@ -70,6 +84,8 @@ export interface PlayerSave {
     achievements: string[];
     friendsList: string[];
     ignoreList: string[];
+    cryptoWallet?: CryptoWallet;
+    goldBalance?: number;
 }
 
 export const defaultAppearance = (): Appearance => {
@@ -140,6 +156,8 @@ export function savePlayerData(player: Player): boolean {
         achievements: player.achievements,
         friendsList: player.friendsList,
         ignoreList: player.ignoreList,
+        cryptoWallet: player.cryptoWallet,
+        goldBalance: player.savedMetadata.goldBalance,
     };
 
     try {
