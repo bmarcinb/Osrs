@@ -142,8 +142,13 @@ class RuneGoldWallet {
             // Initialize contract
             this.contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, this.signer);
 
-            // Check if wallet is already linked
-            this.isLinked = await this.checkIfLinked();
+            // Check if account was previously linked
+            // Try to get username from local storage
+            const savedUsername = localStorage.getItem('gameUsername');
+            if (savedUsername) {
+                this.gameUsername = savedUsername;
+                this.isLinked = await this.checkIfLinked();
+            }
 
             this.updateUI();
             this.showSuccess('Wallet connected successfully!');
@@ -246,6 +251,7 @@ class RuneGoldWallet {
 
                 this.gameUsername = username;
                 this.isLinked = true;
+                localStorage.setItem('gameUsername', username); // Save for next time
                 this.updateUI();
                 this.showSuccess('Account linked successfully!');
                 await this.refreshBalance();
@@ -255,7 +261,17 @@ class RuneGoldWallet {
 
         } catch (error) {
             console.error('Error linking account:', error);
-            this.showError('Failed to link account: ' + error.message);
+            if (error.message.includes('Account is already linked')) {
+                // Account is already linked on blockchain, update our state
+                this.gameUsername = username;
+                this.isLinked = true;
+                localStorage.setItem('gameUsername', username);
+                this.updateUI();
+                this.showSuccess('Account already linked!');
+                await this.refreshBalance();
+            } else {
+                this.showError('Failed to link account: ' + error.message);
+            }
         }
     }
 

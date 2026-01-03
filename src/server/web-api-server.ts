@@ -157,15 +157,60 @@ export class WebApiServer {
                     return res.status(404).json({ success: false, error: 'Player not found' });
                 }
 
-                // Verify wallet matches
-                if (playerSave.cryptoWallet?.address !== walletAddress) {
+                // Verify wallet matches (case-insensitive)
+                if (playerSave.cryptoWallet?.address?.toLowerCase() !== walletAddress.toLowerCase()) {
                     return res.status(403).json({ success: false, error: 'Wallet not linked to this account' });
                 }
 
-                // Verify the blockchain transaction and add gold
+                // Verify the blockchain transaction and add gold as Coins item (ID 995)
                 // TODO: In production, verify the transaction on the blockchain
-                const currentGold = playerSave.goldBalance || 0;
-                playerSave.goldBalance = currentGold + amount;
+                
+                // Initialize inventory if it doesn't exist
+                if (!playerSave.inventory) {
+                    playerSave.inventory = [];
+                }
+
+                // Find existing coins in inventory or add new stack
+                let coinsSlot = -1;
+                for (let i = 0; i < playerSave.inventory.length; i++) {
+                    if (playerSave.inventory[i] && playerSave.inventory[i].itemId === 995) {
+                        coinsSlot = i;
+                        break;
+                    }
+                }
+
+                if (coinsSlot >= 0) {
+                    // Add to existing coins stack
+                    playerSave.inventory[coinsSlot].amount = (playerSave.inventory[coinsSlot].amount || 0) + amount;
+                } else {
+                    // Find first empty slot or add to end
+                    let emptySlot = -1;
+                    for (let i = 0; i < playerSave.inventory.length; i++) {
+                        if (!playerSave.inventory[i]) {
+                            emptySlot = i;
+                            break;
+                        }
+                    }
+                    
+                    const coinsItem = {
+                        itemId: 995,
+                        amount: amount
+                    };
+                    
+                    if (emptySlot >= 0) {
+                        playerSave.inventory[emptySlot] = coinsItem;
+                    } else {
+                        playerSave.inventory.push(coinsItem);
+                    }
+                }
+
+                // Calculate new total
+                let totalCoins = 0;
+                for (const item of playerSave.inventory) {
+                    if (item && item.itemId === 995) {
+                        totalCoins += item.amount || 0;
+                    }
+                }
 
                 // Save updated player data
                 const saved = savePlayerSaveData(playerSave);
@@ -173,9 +218,9 @@ export class WebApiServer {
                     return res.status(500).json({ success: false, error: 'Failed to save player data' });
                 }
 
-                logger.info(`Deposited ${amount} gold for player ${username}, new balance: ${playerSave.goldBalance}, tx: ${txHash}`);
+                logger.info(`Deposited ${amount} gold (Coins item) for player ${username}, new total: ${totalCoins}, tx: ${txHash}`);
 
-                res.json({ success: true, goldBalance: playerSave.goldBalance });
+                res.json({ success: true, goldBalance: totalCoins });
 
             } catch (error) {
                 logger.error('Error processing deposit:', error);
@@ -203,20 +248,53 @@ export class WebApiServer {
                     return res.status(404).json({ success: false, error: 'Player not found' });
                 }
 
-                // Verify wallet matches
-                if (playerSave.cryptoWallet?.address !== walletAddress) {
+                // Verify wallet matches (case-insensitive)
+                if (playerSave.cryptoWallet?.address?.toLowerCase() !== walletAddress.toLowerCase()) {
                     return res.status(403).json({ success: false, error: 'Wallet not linked to this account' });
                 }
 
-                // Check sufficient balance
-                const goldBalance = playerSave.goldBalance || 0;
-                if (goldBalance < amount) {
+                // Check sufficient balance by counting Coins (ID 995) in inventory
+                let totalCoins = 0;
+                const coinSlots = [];
+                
+                if (!playerSave.inventory) {
                     return res.status(400).json({ success: false, error: 'Insufficient gold balance' });
                 }
 
-                // Deduct gold and save
+                for (let i = 0; i < playerSave.inventory.length; i++) {
+                    if (playerSave.inventory[i] && playerSave.inventory[i].itemId === 995) {
+                        totalCoins += playerSave.inventory[i].amount || 0;
+                        coinSlots.push(i);
+                    }
+                }
+
+                if (totalCoins < amount) {
+                    return res.status(400).json({ success: false, error: 'Insufficient gold balance' });
+                }
+
+                // Deduct coins from inventory
                 // TODO: In production, initiate actual blockchain transaction
-                playerSave.goldBalance = goldBalance - amount;
+                let remaining = amount;
+                for (const slot of coinSlots) {
+                    if (remaining <= 0) break;
+                    
+                    const itemAmount = playerSave.inventory[slot].amount || 0;
+                    if (itemAmount <= remaining) {
+                        remaining -= itemAmount;
+                        playerSave.inventory[slot] = null; // Remove entire stack
+                    } else {
+                        playerSave.inventory[slot].amount = itemAmount - remaining;
+                        remaining = 0;
+                    }
+                }
+
+                // Calculate new total
+                let newTotal = 0;
+                for (const item of playerSave.inventory) {
+                    if (item && item.itemId === 995) {
+                        newTotal += item.amount || 0;
+                    }
+                }
 
                 // Save updated player data
                 const saved = savePlayerSaveData(playerSave);
@@ -225,12 +303,42 @@ export class WebApiServer {
                 }
 
                 const mockTxHash = `0x${Date.now().toString(16)}...`;
-                logger.info(`Withdrawal of ${amount} gold initiated for player ${username}, new balance: ${playerSave.goldBalance}`);
+                logger.info(`Withdrawal of ${amount} gold (Coins item) initiated for player ${username}, new total: ${newTotal}`);
 
-                res.json({ success: true, txHash: mockTxHash, goldBalance: playerSave.goldBalance });
+                res.json({ success: true, txHash: mockTxHash, goldBalance: newTotal });
 
             } catch (error) {
                 logger.error('Error processing withdrawal:', error);
+                res.status(500).json({ success: false, error: 'Internal server error' });
+            }
+        });
+
+        // Check if account is linked
+        this.app.get('/api/crypto/check-link', async (req, res) => {
+            try {
+                const { username, walletAddress } = req.query;
+
+                if (!username || !walletAddress) {
+                    return res.status(400).json({ success: false, error: 'Username and wallet address required' });
+                }
+
+                // Load player save
+                const playerSave = loadPlayerSave(username as string);
+                if (!playerSave) {
+                    return res.status(404).json({ success: false, error: 'Player not found' });
+                }
+
+                // Check if wallet is linked
+                const isLinked = playerSave.cryptoWallet?.address?.toLowerCase() === (walletAddress as string).toLowerCase();
+
+                res.json({
+                    success: true,
+                    isLinked: isLinked,
+                    walletAddress: playerSave.cryptoWallet?.address
+                });
+
+            } catch (error) {
+                logger.error('Error checking link status:', error);
                 res.status(500).json({ success: false, error: 'Internal server error' });
             }
         });
@@ -250,10 +358,21 @@ export class WebApiServer {
                     return res.status(404).json({ success: false, error: 'Player not found' });
                 }
 
+                // Calculate total coins from inventory
+                let coinsInInventory = 0;
+                if (playerSave.inventory) {
+                    for (const item of playerSave.inventory) {
+                        if (item && item.itemId === 995) { // Coins item ID
+                            coinsInInventory += item.amount || 0;
+                        }
+                    }
+                }
+
                 res.json({
                     success: true,
-                    goldBalance: playerSave.goldBalance || 0,
-                    walletAddress: playerSave.cryptoWallet?.address
+                    goldBalance: coinsInInventory,
+                    walletAddress: playerSave.cryptoWallet?.address,
+                    isLinked: !!playerSave.cryptoWallet?.address
                 });
 
             } catch (error) {
