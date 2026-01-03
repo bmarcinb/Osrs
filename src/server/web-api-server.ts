@@ -160,9 +160,9 @@ export class WebApiServer {
         // Process deposit
         this.app.post('/api/crypto/deposit', async (req, res) => {
             try {
-                const { username, walletAddress, amount, txHash } = req.body;
+                const { username, walletAddress, amount, txHash, balanceVerified } = req.body;
 
-                logger.info(`[DEPOSIT] Request received - username: ${username}, wallet: ${walletAddress}, amount: ${amount}, txHash: ${txHash}`);
+                logger.info(`[DEPOSIT] Request received - username: ${username}, wallet: ${walletAddress}, amount: ${amount}, txHash: ${txHash}, balanceVerified: ${balanceVerified}`);
 
                 if (!username || !walletAddress || !amount || !txHash) {
                     logger.warn(`[DEPOSIT] Missing required fields`);

@@ -358,33 +358,73 @@ class RuneGoldWallet {
         try {
             this.showLoading('Processing deposit...');
 
-            // Execute deposit transaction on blockchain
-            const tx = await this.contract.deposit(amount);
-            this.showSuccess(`Transaction submitted! Hash: ${tx.hash.substring(0, 10)}...`);
+            // Get balance before transaction
+            const balanceBefore = await this.contract.balanceOf(this.walletAddress);
+            console.log('Balance before deposit:', balanceBefore.toString());
 
-            // Wait for confirmation
-            const receipt = await tx.wait();
+            let txHash = null;
+            let transactionFailed = false;
+            
+            try {
+                // Execute deposit transaction on blockchain
+                const tx = await this.contract.deposit(amount);
+                txHash = tx.hash;
+                this.showSuccess(`Transaction submitted! Hash: ${tx.hash.substring(0, 10)}...`);
 
-            // Notify game server
-            const response = await fetch(`${API_BASE_URL}/crypto/deposit`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    username: this.gameUsername,
-                    walletAddress: this.walletAddress,
-                    amount,
-                    txHash: tx.hash
-                })
-            });
+                // Wait for confirmation
+                const receipt = await tx.wait();
+                console.log('Transaction confirmed:', receipt);
+            } catch (txError) {
+                console.warn('Transaction or confirmation failed (may be RPC error):', txError);
+                transactionFailed = true;
+                // Continue to check balance change
+            }
 
-            const data = await response.json();
+            // Wait a moment for balance to update
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
-            if (data.success) {
-                this.showSuccess(`Successfully deposited ${amount} RGP to your in-game gold!`);
-                await this.refreshBalance();
-                document.getElementById('depositAmount').value = '';
+            // Get balance after transaction
+            const balanceAfter = await this.contract.balanceOf(this.walletAddress);
+            console.log('Balance after deposit:', balanceAfter.toString());
+
+            // Calculate actual balance change
+            const balanceChange = balanceBefore.sub(balanceAfter);
+            console.log('Balance change:', balanceChange.toString());
+
+            // If balance decreased by at least the deposit amount, consider it successful
+            if (balanceChange.gte(amount)) {
+                const actualDeposit = balanceChange.toNumber();
+                console.log(`Balance decreased by ${actualDeposit}, processing deposit`);
+                
+                // Use actual balance change as deposit amount
+                // Notify game server with actual deposited amount
+                const response = await fetch(`${API_BASE_URL}/crypto/deposit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: this.gameUsername,
+                        walletAddress: this.walletAddress,
+                        amount: actualDeposit,
+                        txHash: txHash || 'balance-verified',
+                        balanceVerified: true
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    this.showSuccess(`Successfully deposited ${actualDeposit} RGP to your in-game gold!`);
+                    await this.refreshBalance();
+                    document.getElementById('depositAmount').value = '';
+                } else {
+                    this.showError(data.error || 'Failed to process deposit on game server');
+                }
+            } else if (transactionFailed) {
+                // Transaction failed and balance didn't change
+                this.showError('Transaction failed and balance did not change. Please try again.');
             } else {
-                this.showError(data.error || 'Failed to process deposit on game server');
+                // This shouldn't happen - transaction succeeded but balance didn't decrease
+                this.showError('Transaction completed but balance change not detected. Please check your wallet.');
             }
 
         } catch (error) {
