@@ -15,6 +15,21 @@ import { loadPlayerSave, savePlayerSaveData } from '@engine/world/actor/player/p
 // Load environment variables from .env file
 config();
 
+// Load currency configuration
+let COINS_ITEM_ID = 995; // Default fallback
+try {
+    const currencyConfigPath = join('data', 'config', 'items', 'currency.json');
+    if (existsSync(currencyConfigPath)) {
+        const currencyConfig = JSON.parse(readFileSync(currencyConfigPath, 'utf8'));
+        if (currencyConfig['rs:coins']?.game_id) {
+            COINS_ITEM_ID = currencyConfig['rs:coins'].game_id;
+            logger.info(`Loaded coins item ID from currency.json: ${COINS_ITEM_ID}`);
+        }
+    }
+} catch (error) {
+    logger.warn('Failed to load currency config, using default coins item ID (995)');
+}
+
 export interface WebApiConfig {
     enabled: boolean;
     port: number;
@@ -173,7 +188,7 @@ export class WebApiServer {
                 // Find existing coins in inventory or add new stack
                 let coinsSlot = -1;
                 for (let i = 0; i < playerSave.inventory.length; i++) {
-                    if (playerSave.inventory[i] && playerSave.inventory[i].itemId === 995) {
+                    if (playerSave.inventory[i] && playerSave.inventory[i].itemId === COINS_ITEM_ID) {
                         coinsSlot = i;
                         break;
                     }
@@ -193,7 +208,7 @@ export class WebApiServer {
                     }
                     
                     const coinsItem = {
-                        itemId: 995,
+                        itemId: COINS_ITEM_ID,
                         amount: amount
                     };
                     
@@ -207,7 +222,7 @@ export class WebApiServer {
                 // Calculate new total
                 let totalCoins = 0;
                 for (const item of playerSave.inventory) {
-                    if (item && item.itemId === 995) {
+                    if (item && item.itemId === COINS_ITEM_ID) {
                         totalCoins += item.amount || 0;
                     }
                 }
@@ -262,7 +277,7 @@ export class WebApiServer {
                 }
 
                 for (let i = 0; i < playerSave.inventory.length; i++) {
-                    if (playerSave.inventory[i] && playerSave.inventory[i].itemId === 995) {
+                    if (playerSave.inventory[i] && playerSave.inventory[i].itemId === COINS_ITEM_ID) {
                         totalCoins += playerSave.inventory[i].amount || 0;
                         coinSlots.push(i);
                     }
@@ -291,7 +306,7 @@ export class WebApiServer {
                 // Calculate new total
                 let newTotal = 0;
                 for (const item of playerSave.inventory) {
-                    if (item && item.itemId === 995) {
+                    if (item && item.itemId === COINS_ITEM_ID) {
                         newTotal += item.amount || 0;
                     }
                 }
@@ -362,7 +377,7 @@ export class WebApiServer {
                 let coinsInInventory = 0;
                 if (playerSave.inventory) {
                     for (const item of playerSave.inventory) {
-                        if (item && item.itemId === 995) { // Coins item ID
+                        if (item && item.itemId === COINS_ITEM_ID) {
                             coinsInInventory += item.amount || 0;
                         }
                     }
