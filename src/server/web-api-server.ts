@@ -162,46 +162,71 @@ export class WebApiServer {
             try {
                 const { username, walletAddress, amount, txHash } = req.body;
 
+                logger.info(`[DEPOSIT] Request received - username: ${username}, wallet: ${walletAddress}, amount: ${amount}, txHash: ${txHash}`);
+
                 if (!username || !walletAddress || !amount || !txHash) {
+                    logger.warn(`[DEPOSIT] Missing required fields`);
                     return res.status(400).json({ success: false, error: 'Missing required fields' });
+                }
+
+                // Parse amount as number to ensure it's not a string
+                const depositAmount = typeof amount === 'string' ? parseInt(amount, 10) : amount;
+                if (isNaN(depositAmount) || depositAmount <= 0) {
+                    logger.warn(`[DEPOSIT] Invalid amount: ${amount}`);
+                    return res.status(400).json({ success: false, error: 'Invalid deposit amount' });
                 }
 
                 // Load player save
                 const playerSave = loadPlayerSave(username);
                 if (!playerSave) {
-                    return res.status(404).json({ success: false, error: 'Player not found' });
+                    logger.warn(`[DEPOSIT] Player not found: ${username}`);
+                    return res.status(404).json({ success: false, error: 'Player not found. Please log into the game at least once to create your account.' });
                 }
+
+                logger.info(`[DEPOSIT] Player save loaded successfully for ${username}`);
 
                 // Verify wallet matches (case-insensitive)
                 if (playerSave.cryptoWallet?.address?.toLowerCase() !== walletAddress.toLowerCase()) {
+                    logger.warn(`[DEPOSIT] Wallet mismatch - save: ${playerSave.cryptoWallet?.address}, request: ${walletAddress}`);
                     return res.status(403).json({ success: false, error: 'Wallet not linked to this account' });
                 }
 
-                // Verify the blockchain transaction and add gold as Coins item (ID 995)
+                logger.info(`[DEPOSIT] Wallet verified for ${username}`);
+
+                // Verify the blockchain transaction and add gold as Coins item
                 // TODO: In production, verify the transaction on the blockchain
                 
                 // Initialize inventory if it doesn't exist
                 if (!playerSave.inventory) {
+                    logger.info(`[DEPOSIT] Initializing empty inventory for ${username}`);
                     playerSave.inventory = [];
                 }
+
+                // Log inventory state before deposit
+                const coinsBefore = playerSave.inventory.filter(item => item && item.itemId === COINS_ITEM_ID)
+                    .reduce((sum, item) => sum + (item.amount || 0), 0);
+                logger.info(`[DEPOSIT] Inventory before deposit - Coins: ${coinsBefore}, Total items: ${playerSave.inventory.length}`);
 
                 // Find existing coins in inventory or add new stack
                 let coinsSlot = -1;
                 for (let i = 0; i < playerSave.inventory.length; i++) {
                     if (playerSave.inventory[i] && playerSave.inventory[i].itemId === COINS_ITEM_ID) {
                         coinsSlot = i;
+                        logger.info(`[DEPOSIT] Found existing coins at slot ${i}, current amount: ${playerSave.inventory[i].amount}`);
                         break;
                     }
                 }
 
                 if (coinsSlot >= 0) {
                     // Add to existing coins stack
-                    playerSave.inventory[coinsSlot].amount = (playerSave.inventory[coinsSlot].amount || 0) + amount;
+                    const oldAmount = playerSave.inventory[coinsSlot].amount || 0;
+                    playerSave.inventory[coinsSlot].amount = oldAmount + depositAmount;
+                    logger.info(`[DEPOSIT] Updated existing coins stack: ${oldAmount} + ${depositAmount} = ${playerSave.inventory[coinsSlot].amount}`);
                 } else {
                     // Find first empty slot or add to end
                     let emptySlot = -1;
                     for (let i = 0; i < playerSave.inventory.length; i++) {
-                        if (!playerSave.inventory[i]) {
+                        if (!playerSave.inventory[i] || playerSave.inventory[i] === null) {
                             emptySlot = i;
                             break;
                         }
@@ -209,13 +234,15 @@ export class WebApiServer {
                     
                     const coinsItem = {
                         itemId: COINS_ITEM_ID,
-                        amount: amount
+                        amount: depositAmount
                     };
                     
                     if (emptySlot >= 0) {
                         playerSave.inventory[emptySlot] = coinsItem;
+                        logger.info(`[DEPOSIT] Added new coins stack at empty slot ${emptySlot}, amount: ${depositAmount}`);
                     } else {
                         playerSave.inventory.push(coinsItem);
+                        logger.info(`[DEPOSIT] Added new coins stack at end (slot ${playerSave.inventory.length - 1}), amount: ${depositAmount}`);
                     }
                 }
 
@@ -227,19 +254,22 @@ export class WebApiServer {
                     }
                 }
 
+                logger.info(`[DEPOSIT] Inventory after deposit - Total coins: ${totalCoins}`);
+
                 // Save updated player data
                 const saved = savePlayerSaveData(playerSave);
                 if (!saved) {
+                    logger.error(`[DEPOSIT] Failed to save player data for ${username}`);
                     return res.status(500).json({ success: false, error: 'Failed to save player data' });
                 }
 
-                logger.info(`Deposited ${amount} gold (Coins item) for player ${username}, new total: ${totalCoins}, tx: ${txHash}`);
+                logger.info(`[DEPOSIT] SUCCESS - Deposited ${depositAmount} gold (Coins item ID ${COINS_ITEM_ID}) for player ${username}, new total: ${totalCoins}, tx: ${txHash}`);
 
-                res.json({ success: true, goldBalance: totalCoins });
+                res.json({ success: true, goldBalance: totalCoins, deposited: depositAmount });
 
             } catch (error) {
-                logger.error('Error processing deposit:', error);
-                res.status(500).json({ success: false, error: 'Internal server error' });
+                logger.error('[DEPOSIT] Error processing deposit:', error);
+                res.status(500).json({ success: false, error: 'Internal server error: ' + (error instanceof Error ? error.message : String(error)) });
             }
         });
 
@@ -370,18 +400,24 @@ export class WebApiServer {
                 // Load player save
                 const playerSave = loadPlayerSave(username as string);
                 if (!playerSave) {
+                    logger.warn(`[BALANCE] Player not found: ${username}`);
                     return res.status(404).json({ success: false, error: 'Player not found' });
                 }
 
                 // Calculate total coins from inventory
                 let coinsInInventory = 0;
+                const coinStacks = [];
                 if (playerSave.inventory) {
-                    for (const item of playerSave.inventory) {
+                    for (let i = 0; i < playerSave.inventory.length; i++) {
+                        const item = playerSave.inventory[i];
                         if (item && item.itemId === COINS_ITEM_ID) {
                             coinsInInventory += item.amount || 0;
+                            coinStacks.push({ slot: i, amount: item.amount });
                         }
                     }
                 }
+
+                logger.info(`[BALANCE] Player ${username} - Total coins: ${coinsInInventory}, Coin stacks: ${JSON.stringify(coinStacks)}, Inventory length: ${playerSave.inventory?.length || 0}`);
 
                 res.json({
                     success: true,
@@ -391,7 +427,7 @@ export class WebApiServer {
                 });
 
             } catch (error) {
-                logger.error('Error getting balance:', error);
+                logger.error('[BALANCE] Error getting balance:', error);
                 res.status(500).json({ success: false, error: 'Internal server error' });
             }
         });
